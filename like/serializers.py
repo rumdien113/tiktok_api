@@ -25,7 +25,7 @@ class LikeCreateSerializer(serializers.ModelSerializer):
         
         # Check if target exists
         if target_type == 'post':
-            from posts.models import Post
+            from post.models import Post
             try:
                 Post.objects.get(id=target_id)
             except Post.DoesNotExist:
@@ -46,5 +46,9 @@ class LikeCreateSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         user = self.context['request'].user
-        like = Like.objects.create(user=user, **validated_data)
+        like = Like.objects.create(
+            user=user,
+            target_id=validated_data['target_id'],
+            target_type=validated_data['target_type']
+        )
         return like

@@ -15,17 +15,17 @@ class PostSerializer(serializers.ModelSerializer):
     
     def get_likes_count(self, obj):
         # Import inside method to avoid circular imports
-        from likes.models import Like
+        from like.models import Like
         return Like.objects.filter(target_id=obj.id, target_type='post').count()
     
     def get_comments_count(self, obj):
         # Import inside method to avoid circular imports
-        from comments.models import Comment
+        from comment.models import Comment
         return Comment.objects.filter(post=obj).count()
     
     def get_shares_count(self, obj):
         # Import inside method to avoid circular imports
-        from shares.models import Share
+        from share.models import Share
         return Share.objects.filter(post=obj).count()
 
 class PostCreateSerializer(serializers.ModelSerializer):

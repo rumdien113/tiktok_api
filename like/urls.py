@@ -1,10 +1,7 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import LikeViewSet
-
-router = DefaultRouter()
-router.register(r'likes', LikeViewSet)
+from django.urls import path
+from .views import LikeCreateDestroyView, LikedUsersListView
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('<str:target_type>/<str:target_id>/like/', LikeCreateDestroyView.as_view(), name='like-create-destroy'),
+    path('<str:target_type>/<str:target_id>/likes/', LikedUsersListView.as_view(), name='like-list'),
 ]

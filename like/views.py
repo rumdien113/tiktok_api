@@ -1,64 +1,51 @@
-from rest_framework import viewsets, permissions, status, mixins
+from rest_framework import generics, views, status
 from rest_framework.response import Response
-from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
+from django.db.models import Q
+
 from .models import Like
 from .serializers import LikeSerializer, LikeCreateSerializer
 
-class IsOwnerOrReadOnly(permissions.BasePermission):
-    def has_object_permission(self, request, view, obj):
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        return obj.user == request.user
+class LikeCreateDestroyView(generics.CreateAPIView,
+                           generics.DestroyAPIView):
+    """
+    Create a like or unlike (delete) a post or comment.
+    """
+    serializer_class = LikeCreateSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'target_id'  # Use target_id for delete
 
-class LikeViewSet(mixins.CreateModelMixin,
-                  mixins.DestroyModelMixin,
-                  mixins.ListModelMixin,
-                  viewsets.GenericViewSet):
-    queryset = Like.objects.all()
-    permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
-    
-    def get_serializer_class(self):
-        if self.action == 'create':
-            return LikeCreateSerializer
-        return LikeSerializer
-    
     def get_queryset(self):
-        """Filter likes by target_id and target_type if provided"""
-        queryset = Like.objects.all()
-        target_id = self.request.query_params.get('target_id')
-        target_type = self.request.query_params.get('target_type')
-        
-        if target_id and target_type:
-            queryset = queryset.filter(target_id=target_id, target_type=target_type)
-        elif target_id:
-            queryset = queryset.filter(target_id=target_id)
-        elif target_type:
-            queryset = queryset.filter(target_type=target_type)
-            
-        return queryset
+        target_id = self.kwargs['target_id']
+        target_type = self.kwargs['target_type']
+        return Like.objects.filter(user=self.request.user, target_id=target_id, target_type=target_type)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response({"detail": "Liked successfully."}, status=status.HTTP_201_CREATED)
+
+    def delete(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        if not queryset.exists():
+            return Response({"detail": "You haven't liked this item yet."}, status=status.HTTP_400_BAD_REQUEST)
+        self.perform_destroy(queryset.first())
+        return Response({"detail": "Unliked successfully."}, status=status.HTTP_204_NO_CONTENT)
     
-    @action(detail=False, methods=['delete'])
-    def unlike(self, request):
-        """Remove a like by target_id and target_type"""
-        target_id = request.query_params.get('target_id')
-        target_type = request.query_params.get('target_type')
-        
-        if not target_id or not target_type:
-            return Response(
-                {"error": "Both target_id and target_type are required"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        try:
-            like = Like.objects.get(
-                user=request.user,
-                target_id=target_id,
-                target_type=target_type
-            )
-            like.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        except Like.DoesNotExist:
-            return Response(
-                {"error": "Like does not exist"}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+    
+
+class LikedUsersListView(generics.ListAPIView):
+    """
+    Get all users who liked a specific post or comment.
+    """
+    serializer_class = LikeSerializer
+    permission_classes = [IsAuthenticated]  # Or AllowAny, depending on your requirements
+
+    def get_queryset(self):
+        target_id = self.kwargs['target_id']
+        target_type = self.kwargs['target_type']
+        return Like.objects.filter(target_id=target_id, target_type=target_type)
