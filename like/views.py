@@ -9,9 +9,6 @@ from .serializers import LikeSerializer, LikeCreateSerializer
 
 class LikeCreateDestroyView(generics.CreateAPIView,
                            generics.DestroyAPIView):
-    """
-    Create a like or unlike (delete) a post or comment.
-    """
     serializer_class = LikeCreateSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = 'target_id'  # Use target_id for delete
@@ -39,9 +36,6 @@ class LikeCreateDestroyView(generics.CreateAPIView,
     
 
 class LikedUsersListView(generics.ListAPIView):
-    """
-    Get all users who liked a specific post or comment.
-    """
     serializer_class = LikeSerializer
     permission_classes = [IsAuthenticated]  # Or AllowAny, depending on your requirements
 
