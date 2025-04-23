@@ -1,61 +1,61 @@
-from rest_framework.views import APIView
-from rest_framework import status
+from rest_framework import viewsets, permissions, status, filters
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
+from .models import Post
+from .serializers import PostSerializer, PostCreateSerializer
+from django.db.models import Q
 
-from post.models import Post
-from .serializers import PostSerializer
+class IsOwnerOrReadOnly(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return obj.user == request.user
 
-class PostView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        serizalizer = PostSerializer(data=request.data)
-        if serizalizer.is_valid():
-            serizalizer.save()
-            return Response(serizalizer.data, status=status.HTTP_201_CREATED)
-        return Response({
-            'error': serizalizer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
-
-    def get(self, request, id=None):
-        if id:
-            try:
-                post = Post.objects.get(id=id)
-                serializer = PostSerializer(post)
-                return Response(serializer.data, status=status.HTTP_200_OK)
-            except Post.DoesNotExist:
-                return Response({
-                    'error': 'Post not found'
-                }, status=status.HTTP_404_NOT_FOUND)
-        else:
-            posts = Post.objects.all()
-            serializer = PostSerializer(posts, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-
-    def patch(self, request, id):
-        try:
-            post = Post.objects.get(id=id)
-        except Post.DoesNotExist:
-            return Response({
-                'error': 'Post not found'
-            }, status=status.HTTP_404_NOT_FOUND)
-        serializer = PostSerializer(post, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response({
-            'message': serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
-
-    def delete(self, request, id):
-        try:
-            post = Post.objects.get(id=id)
-        except Post.DoesNotExist:
-            return Response({
-                'error': 'Post not found'
-            }, status=status.HTTP_404_NOT_FOUND)
-        post.delete()
-        return Response({
-            'message': 'Post deleted successfully'
-        }, status=status.HTTP_204_NO_CONTENT)
+class PostViewSet(viewsets.ModelViewSet):
+    queryset = Post.objects.all().order_by('-created_at')
+    permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['description']
+    
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return PostCreateSerializer
+        return PostSerializer
+    
+    @action(detail=False, methods=['get'])
+    def feed(self, request):
+        """Get posts from followed users and the requesting user"""
+        user = request.user
+        # Get list of followed users' IDs
+        from follows.models import Follow
+        followed_users = Follow.objects.filter(follower=user).values_list('followed', flat=True)
+        
+        # Get posts from followed users and the user's own posts
+        posts = Post.objects.filter(
+            Q(user__in=followed_users) | Q(user=user)
+        ).order_by('-created_at')
+        
+        page = self.paginate_queryset(posts)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(posts, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def user_posts(self, request):
+        """Get posts from a specific user"""
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            return Response({"error": "user_id parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        posts = Post.objects.filter(user__id=user_id).order_by('-created_at')
+        
+        page = self.paginate_queryset(posts)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = self.get_serializer(posts, many=True)
+        return Response(serializer.data)
