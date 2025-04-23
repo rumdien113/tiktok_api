@@ -1,61 +1,37 @@
+from rest_framework import generics
 from rest_framework.views import APIView
-from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated  # Import IsAuthenticated
 
-from comment.models import Comment
+from .models import Comment
 from .serializers import CommentSerializer
 
-class CommentView(APIView):
-    permission_classes = [IsAuthenticated]
+class CommentListCreateView(generics.ListCreateAPIView):
+    queryset = Comment.objects.all()
+    serializer_class = CommentSerializer
+    permission_classes = [IsAuthenticated]  # Add permission check
 
-    def post(self, request):
-        serializer = CommentSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response({
-            'error': serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
-    def get(self, request, id=None):
-        if id:
-            try:
-                comment = Comment.objects.get(id=id)
-                serializer = CommentSerializer(comment)
-                return Response(serializer.data, status=status.HTTP_200_OK)
-            except Comment.DoesNotExist:
-                return Response({
-                    'error': 'Comment not found'
-                }, status=status.HTTP_404_NOT_FOUND)
-        else:
-            comments = Comment.objects.all()
-            serializer = CommentSerializer(comments, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class CommentRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Comment.objects.all()
+    serializer_class = CommentSerializer
+    permission_classes = [IsAuthenticated]  # Add permission check
         
-    def patch(self, request, id):
-        try:
-            comment = Comment.objects.get(id=id)
-        except Comment.DoesNotExist:
-            return Response({
-                'error': 'Comment not found'
-            }, status=status.HTTP_404_NOT_FOUND)
-        serializer = CommentSerializer(comment, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response({
-            'message': serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
-    def delete(self, request, id):
-        try:
-            comment = Comment.objects.get(id=id)
-        except Comment.DoesNotExist:
-            return Response({
-                'error': 'Comment not found'
-            }, status=status.HTTP_404_NOT_FOUND)
-        comment.delete()
-        return Response({
-            'message': 'Comment deleted successfully'
-        }, status=status.HTTP_204_NO_CONTENT)
+
+class CommentReplyListView(APIView):
+    def get(self, request, parent_comment_id):
+        replies = Comment.objects.filter(parent_comment_id=parent_comment_id)
+        serializer = CommentSerializer(replies, many=True)
+        return Response(serializer.data)
+
+class CommentListViewByPost(generics.ListAPIView):
+    serializer_class = CommentSerializer
+    # permission_classes = [IsAuthenticated] # Optionally, require authentication to view comments
+
+    def get_queryset(self):
+        post_id = self.kwargs['post_id']
+        return Comment.objects.filter(post_id=post_id)

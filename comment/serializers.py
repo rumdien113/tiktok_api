@@ -7,7 +7,7 @@ from user.models import User
 from .models import Comment
 
 class CommentSerializer(serializers.ModelSerializer):
-    user = serializers.CharField(write_only=True)
+    # user = serializers.CharField(write_only=True) # Remove user field
     post = serializers.CharField(write_only=True)
     parent_comment = serializers.CharField(write_only=True, required=False, allow_null=True)
     parent_comment_id = serializers.UUIDField(source='parent_comment.id', read_only=True)
@@ -16,7 +16,7 @@ class CommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ['id', 'user', 'post', 'parent_comment', 'parent_comment_id', 'content', 'create_at', 'updated_at']
+        fields = ['id', 'post', 'parent_comment', 'parent_comment_id', 'content', 'create_at', 'updated_at'] # Remove 'user'
 
     def get_object_by_id(self, model, obj_id, field_name):
         try:
@@ -30,7 +30,7 @@ class CommentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({field_name: f'{model.__name__} not found'})
 
     def create(self, validated_data):
-        user = self.get_object_by_id(User, validated_data.pop('user'), 'u_id')
+        # user = self.get_object_by_id(User, validated_data.pop('user'), 'u_id') # Remove this line
         post = self.get_object_by_id(Post, validated_data.pop('post'), 'post')
         
         parent_comment = validated_data.pop('parent_comment', None)
@@ -39,9 +39,8 @@ class CommentSerializer(serializers.ModelSerializer):
         if parent_comment:
             parent_comment_obj = self.get_object_by_id(Comment, parent_comment, 'parent_comment')
 
-        validated_data['user'] = user
+        # validated_data['user'] = user # Remove this line
         validated_data['post'] = post
         validated_data['parent_comment'] = parent_comment_obj
 
         return Comment.objects.create(**validated_data)
-
