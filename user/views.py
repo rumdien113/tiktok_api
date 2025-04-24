@@ -11,7 +11,7 @@ from .models import User
 
 class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
-    
+
     @swagger_auto_schema(
         operation_description="Lấy thông tin của người dùng hiện tại.",
         responses={
@@ -25,8 +25,35 @@ class CurrentUserView(APIView):
         serializer = UserSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(
+        operation_description="Cập nhật thông tin người dùng hiện tại.",
+        request_body=UserSerializer,
+        responses={
+            200: 'User updated successfully',
+            400: 'Invalid input data',
+            401: 'Unauthorized'
+        },
+        security=[{'Bearer': []}],
+    )
+    def patch(self, request):
+        user = request.user  # Get the current authenticated user
+
+        serializer = UserSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            user_data = serializer.data
+            return Response({
+                'code': 200,
+                'message': 'ok',
+                'user': user_data
+            }, status=status.HTTP_200_OK)
+        return Response({
+            'code': 400,
+            'message': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
 class UserView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated] # Keep IsAuthenticated for other methods if needed
 
     @swagger_auto_schema(
         security=[{'Bearer': []}],
@@ -51,54 +78,22 @@ class UserView(APIView):
             serializer = UserSerializer(users, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @swagger_auto_schema(
-        security=[{'Bearer': []}],
-        operation_description="Cập nhật thông tin người dùng.",
-        responses={
-            200: 'User updated successfully',
-            400: 'Invalid input data',
-            404: 'User not found'
-        }
-    )
-    def patch(self, request, id):
-        try:
-            user = User.objects.get(id=id)
-        except User.DoesNotExist:
-            return Response({
-                'code': 404,
-                'message': 'User not found'
-            }, status=status.HTTP_404_NOT_FOUND)
-
-        serializer = UserSerializer(user, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            user_data = serializer.data  # Lấy dữ liệu đã serialize
-            return Response({
-                'code': 200,
-                'message': 'ok',
-                'user': user_data
-            }, status=status.HTTP_200_OK)
-        return Response({
-            'code': 400,
-            'message': serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
-
-    @swagger_auto_schema(
-        security=[{'Bearer': []}],
-        operation_description="Xóa người dùng.",
-        responses={
-            200: 'User deleted successfully',
-            404: 'User not found'
-        }
-    )
-    def delete(self, request, id):
-        try:
-            user = User.objects.get(id=id)
-        except ObjectDoesNotExist:
-            return Response({
-                'error': 'User not found'
-            }, status=status.HTTP_404_NOT_FOUND)
-        user.delete()
-        return Response({
-            'message': 'User deleted successfully'
-        }, status=status.HTTP_200_OK)
+    # @swagger_auto_schema(
+    #     security=[{'Bearer': []}],
+    #     operation_description="Xóa người dùng.",
+    #     responses={
+    #         200: 'User deleted successfully',
+    #         404: 'User not found'
+    #     }
+    # )
+    # def delete(self, request, id):
+    #     try:
+    #         user = User.objects.get(id=id)
+    #     except ObjectDoesNotExist:
+    #         return Response({
+    #             'error': 'User not found'
+    #         }, status=status.HTTP_404_NOT_FOUND)
+    #     user.delete()
+    #     return Response({
+    #         'message': 'User deleted successfully'
+    #     }, status=status.HTTP_200_OK)
