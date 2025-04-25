@@ -6,7 +6,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
-from .serializers import UserSerializer
+from .serializers import UserSerializer, PasswordChangeSerializer
 from .models import User
 
 class CurrentUserView(APIView):
@@ -46,6 +46,40 @@ class CurrentUserView(APIView):
                 'code': 200,
                 'message': 'ok',
                 'user': user_data
+            }, status=status.HTTP_200_OK)
+        return Response({
+            'code': 400,
+            'message': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+    @swagger_auto_schema(
+        operation_description="Thay đổi mật khẩu của người dùng hiện tại.",
+        request_body=PasswordChangeSerializer,
+        responses={
+            200: 'Password changed successfully',
+            400: 'Invalid input data or old password incorrect',
+            401: 'Unauthorized'
+        },
+        security=[{'Bearer': []}],
+    )
+    def put(self, request): # Using PUT for full update of password
+        serializer = PasswordChangeSerializer(data=request.data)
+        if serializer.is_valid():
+            user = request.user
+            old_password = serializer.validated_data['old_password']
+            new_password = serializer.validated_data['new_password']
+
+            if not user.check_password(old_password):
+                return Response({
+                    'code': 400,
+                    'message': 'Mật khẩu cũ không đúng.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            user.set_password(new_password)
+            user.save()
+
+            return Response({
+                'code': 200,
+                'message': 'Đổi mật khẩu thành công.'
             }, status=status.HTTP_200_OK)
         return Response({
             'code': 400,
