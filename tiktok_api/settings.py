@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'share',
     'tag',
     'user',
+    'ai_result'
 ]
 
 MIDDLEWARE = [
@@ -185,3 +186,6 @@ SIMPLE_JWT = {
 }
 
 AUTH_USER_MODEL = 'user.User'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'ai_result', 'media')

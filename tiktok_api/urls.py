@@ -4,6 +4,8 @@ from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from rest_framework import permissions
 from rest_framework_simplejwt.views import TokenRefreshView
+from django.conf import settings 
+from django.conf.urls.static import static
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -25,7 +27,7 @@ urlpatterns = [
     path('api/v1/follow/', include('follow.urls')),
     path('api/v1/report/', include('report.urls')),
     path('api/v1/share/', include('share.urls')),
-    # path('api/v1/tag/', include('tag.urls')),
+    path('api/v1/', include('ai_result.urls')),
     
     path('api/v1/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
@@ -34,3 +36,6 @@ urlpatterns = [
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     path('swagger.json', schema_view.without_ui(cache_timeout=0), name='schema-json'),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
