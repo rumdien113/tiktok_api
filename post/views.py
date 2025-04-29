@@ -137,6 +137,8 @@ class PostDetailView(APIView):
         post.delete()
         return Response({"detail": "Post deleted successfully."}, status=status.HTTP_200_OK)  # Thay đổi từ 204 thành 200
 
+NUM_RANDOM_POSTS = 3
+
 class RandomPostView(APIView):
     @swagger_auto_schema(
         operation_description="Get a random post.",
@@ -146,11 +148,31 @@ class RandomPostView(APIView):
         }
     )
     def get(self, request):
-        posts_count = Post.objects.count()
-        if posts_count > 0:
-            random_index = random.randint(0, posts_count - 1)
-            random_post = Post.objects.all()[random_index]
-            serializer = PostSerializer(random_post)
-            return Response(serializer.data)
-        else:
-            return Response({"detail": "No posts available."}, status=status.HTTP_404_NOT_FOUND)
+        # Lấy danh sách tất cả các ID một cách hiệu quả
+        # values_list('id', flat=True) trả về một queryset các ID
+        post_ids = list(Post.objects.values_list('id', flat=True)) # Chuyển sang list Python
+
+        posts_count = len(post_ids)
+
+        if posts_count == 0:
+             return Response({"detail": "No posts available."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Xác định số lượng post thực tế cần lấy (min của tổng số post hoặc số lượng yêu cầu)
+        num_to_sample = min(posts_count, NUM_RANDOM_POSTS)
+
+        # Chọn ngẫu nhiên các ID từ danh sách
+        random_ids = random.sample(post_ids, num_to_sample)
+
+        # Fetch các post tương ứng với các ID đã chọn
+        # filter(id__in=random_ids) sẽ trả về queryset chứa các post này
+        # Thứ tự trả về có thể không giống với thứ tự trong random_ids,
+        # nhưng thường không quan trọng cho mục đích queue ở frontend.
+        random_posts_queryset = Post.objects.filter(id__in=random_ids)
+
+
+        # Serialize danh sách các post
+        # Phải thêm many=True khi serialize nhiều đối tượng
+        serializer = PostSerializer(random_posts_queryset, many=True)
+
+        # Trả về danh sách dữ liệu post
+        return Response(serializer.data)
