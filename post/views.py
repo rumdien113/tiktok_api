@@ -140,39 +140,40 @@ class PostDetailView(APIView):
 NUM_RANDOM_POSTS = 3
 
 class RandomPostView(APIView):
+    # Cân nhắc thêm permission nếu chỉ user đăng nhập mới cần check is_liked
+    # permission_classes = [IsAuthenticatedOrReadOnly] # Cho phép xem nhưng chỉ user đăng nhập mới check được is_liked
+
     @swagger_auto_schema(
-        operation_description="Get a random post.",
+        # Cập nhật lại mô tả và response cho đúng là list các post
+        operation_description=f"Get up to {NUM_RANDOM_POSTS} random posts for a frontend queue.",
         responses={
-            200: openapi.Response("Random post.", PostSerializer),
+            200: openapi.Response(f"A list of up to {NUM_RANDOM_POSTS} random posts.", PostSerializer(many=True)),
             404: "No posts available.",
         }
     )
+
     def get(self, request):
         # Lấy danh sách tất cả các ID một cách hiệu quả
-        # values_list('id', flat=True) trả về một queryset các ID
-        post_ids = list(Post.objects.values_list('id', flat=True)) # Chuyển sang list Python
+        post_ids = list(Post.objects.values_list('id', flat=True))
 
         posts_count = len(post_ids)
 
         if posts_count == 0:
-             return Response({"detail": "No posts available."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"detail": "No posts available."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Xác định số lượng post thực tế cần lấy (min của tổng số post hoặc số lượng yêu cầu)
+        # Xác định số lượng post thực tế cần lấy
         num_to_sample = min(posts_count, NUM_RANDOM_POSTS)
 
         # Chọn ngẫu nhiên các ID từ danh sách
         random_ids = random.sample(post_ids, num_to_sample)
 
         # Fetch các post tương ứng với các ID đã chọn
-        # filter(id__in=random_ids) sẽ trả về queryset chứa các post này
-        # Thứ tự trả về có thể không giống với thứ tự trong random_ids,
-        # nhưng thường không quan trọng cho mục đích queue ở frontend.
         random_posts_queryset = Post.objects.filter(id__in=random_ids)
-
 
         # Serialize danh sách các post
         # Phải thêm many=True khi serialize nhiều đối tượng
-        serializer = PostSerializer(random_posts_queryset, many=True)
+        # SỬA LỖI is_liked tại đây: Thêm context={'request': request}
+        serializer = PostSerializer(random_posts_queryset, many=True, context={'request': request}) # <-- ĐÃ SỬA
 
         # Trả về danh sách dữ liệu post
         return Response(serializer.data)

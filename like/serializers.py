@@ -31,7 +31,7 @@ class LikeCreateSerializer(serializers.ModelSerializer):
             except Post.DoesNotExist:
                 raise serializers.ValidationError(f"Post with id {target_id} does not exist")
         elif target_type == 'comment':
-            from comments.models import Comment
+            from comment.models import Comment
             try:
                 Comment.objects.get(id=target_id)
             except Comment.DoesNotExist:

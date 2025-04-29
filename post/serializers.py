@@ -2,11 +2,13 @@ from rest_framework import status
 from rest_framework import serializers
 from rest_framework.serializers import ValidationError
 from .models import Post # Assuming your Post model is in models.py
+from like.models import Like
 from user.serializers import UserSerializer # Keep existing import
 from ai_result.utils import process_and_upload_image, process_and_upload_video
 
 class PostSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
+    is_liked = serializers.SerializerMethodField()
     likes_count = serializers.SerializerMethodField()
     comments_count = serializers.SerializerMethodField()
     shares_count = serializers.SerializerMethodField()
@@ -14,7 +16,21 @@ class PostSerializer(serializers.ModelSerializer):
     class Meta:
         model = Post
         fields = ['id', 'user', 'media', 'description', 'created_at', 'updated_at',
-                 'likes_count', 'comments_count', 'shares_count']
+                 'is_liked', 'likes_count', 'comments_count', 'shares_count']
+
+    def get_is_liked(self, obj):
+        """
+        Kiểm tra xem người dùng đang request đã like post này hay chưa.
+        """
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            # Kiểm tra trong bảng Like - Bây giờ Like đã được import ở trên đầu
+            return Like.objects.filter( # <-- Dòng gây lỗi trước đó
+                user=request.user, # Người dùng hiện tại
+                target_id=obj.id,    # ID của post
+                target_type='post'   # Loại đối tượng là post
+            ).exists()
+        return False # Trả về False nếu không có request hoặc người dùng chưa đăng nhập
 
     def get_likes_count(self, obj):
         from like.models import Like
