@@ -1,13 +1,14 @@
 import uuid
 from rest_framework import serializers
 
+from user.serializers import UserSerializer # Keep existing import
 from post.models import Post
 from user.models import User
 from like.models import Like
 from .models import Comment
 
 class CommentSerializer(serializers.ModelSerializer):
-    # user = serializers.CharField(write_only=True) # Remove user field
+    user = UserSerializer(read_only=True)
     post = serializers.CharField(write_only=True)
     parent_comment = serializers.CharField(write_only=True, required=False, allow_null=True)
     parent_comment_id = serializers.UUIDField(source='parent_comment.id', read_only=True)
@@ -18,7 +19,7 @@ class CommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ['id', 'post', 'parent_comment', 'parent_comment_id', 'content', 'is_liked', 'likes_count', 'create_at', 'updated_at'] # Remove 'user'
+        fields = ['id', 'user', 'post', 'parent_comment', 'parent_comment_id', 'content', 'is_liked', 'likes_count', 'create_at', 'updated_at'] # Remove 'user'
 
     def get_is_liked(self, obj):
         """
