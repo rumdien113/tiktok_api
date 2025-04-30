@@ -177,3 +177,49 @@ class RandomPostView(APIView):
 
         # Trả về danh sách dữ liệu post
         return Response(serializer.data)
+
+class PostSearchView(APIView):
+    """
+    API view to search for posts by description.
+    """
+    # Quyền truy cập: cho phép bất kỳ ai (đăng nhập hoặc không) xem kết quả tìm kiếm
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
+    @swagger_auto_schema(
+        operation_description="Search for posts by description.",
+        manual_parameters=[
+            openapi.Parameter(
+                'query', # Tên query parameter, bạn có thể dùng 'description' nếu muốn
+                openapi.IN_QUERY,
+                description="Search term for post description (case-insensitive partial match).",
+                type=openapi.TYPE_STRING,
+                required=True # Tham số tìm kiếm là bắt buộc cho API search này
+            ),
+        ],
+        responses={
+            200: openapi.Response(
+                description="A list of posts matching the search query.",
+                # Sử dụng PostSerializer cho danh sách các post
+                schema=PostSerializer(many=True)
+            ),
+            400: "Bad Request (if query parameter is missing)",
+        },
+         # Thêm security nếu chỉ user đăng nhập mới được search
+        # security=[{'Bearer': []}]
+    )
+    def get(self, request):
+        search_query = request.query_params.get('query', None) # Lấy query parameter tên là 'query'
+
+        if not search_query:
+            # Trả về lỗi nếu thiếu tham số tìm kiếm
+            return Response({'query': ['This query parameter is required for search.']}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Thực hiện tìm kiếm trong trường description (không phân biệt hoa thường, chứa chuỗi)
+        posts = Post.objects.filter(description__icontains=search_query)
+
+        # Serialize kết quả tìm kiếm
+        # Truyền context để PostSerializer có thể xác định is_liked
+        serializer = PostSerializer(posts, many=True, context={'request': request})
+
+        # Trả về danh sách các bài đăng tìm thấy
+        return Response(serializer.data, status=status.HTTP_200_OK)

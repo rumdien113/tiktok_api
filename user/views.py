@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ObjectDoesNotExist
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from django.db.models import Q
 
 from .serializers import UserSerializer, PasswordChangeSerializer
 from .models import User
@@ -91,10 +92,22 @@ class UserView(APIView):
 
     @swagger_auto_schema(
         security=[{'Bearer': []}],
-        operation_description="Lấy thông tin người dùng. Nếu cung cấp ID, trả về thông tin của người dùng đó, nếu không sẽ trả về tất cả người dùng.",
+        operation_description="Lấy thông tin người dùng theo ID.",
+        # Thêm định nghĩa tường minh cho tham số ID trong path
+        manual_parameters=[
+            openapi.Parameter(
+                'id', # Tên tham số phải khớp với tên trong URL pattern
+                openapi.IN_PATH,
+                description="UUID của người dùng cần lấy thông tin chi tiết",
+                type=openapi.TYPE_STRING, # Hoặc openapi.TYPE_INTEGER nếu ID là int
+                format=openapi.FORMAT_UUID, # Sử dụng format UUID nếu ID là UUID
+                required=True # Tham số path luôn là bắt buộc
+            ),
+        ],
         responses={
-            200: 'User data retrieved successfully',
-            404: 'User not found'
+            200: openapi.Response('User data retrieved successfully', UserSerializer), # Sử dụng serializer để mô tả response
+            404: 'User not found',
+            401: 'Unauthorized'
         }
     )
     def get(self, request, id=None):
@@ -131,3 +144,41 @@ class UserView(APIView):
     #     return Response({
     #         'message': 'User deleted successfully'
     #     }, status=status.HTTP_200_OK)
+
+class UserSearchView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        security=[{'Bearer': []}],
+        operation_description="Tìm kiếm người dùng theo username.",
+        manual_parameters=[
+             openapi.Parameter(
+                'username',
+                openapi.IN_QUERY,
+                description="Username để tìm kiếm (tìm kiếm gần đúng)",
+                type=openapi.TYPE_STRING,
+                required=True # Tham số tìm kiếm là bắt buộc cho API search này
+            ),
+        ],
+        responses={
+            200: openapi.Response(
+                description="Danh sách người dùng tìm thấy.",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_ARRAY,
+                    items=UserSerializer # Mảng các UserSerializer
+                )
+            ),
+            401: 'Unauthorized',
+            400: 'Bad Request' # Nếu thiếu tham số username
+        }
+    )
+    def get(self, request):
+        username_query = request.query_params.get('username', None)
+
+        if not username_query:
+             return Response({'username': ['This query parameter is required for search.']}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Tìm kiếm username chứa chuỗi username_query (không phân biệt hoa thường)
+        users = User.objects.filter(username__icontains=username_query)
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
