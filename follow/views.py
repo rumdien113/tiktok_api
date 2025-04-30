@@ -120,3 +120,44 @@ class FollowingListView(generics.ListAPIView):
     def get_queryset(self):
         # Get the users the current user is following
         return Follow.objects.filter(follower=self.request.user)
+
+class CheckFollowStatusView(APIView):
+    """
+    API view to check if the current user is following a specific user.
+    Requires authentication.
+    """
+    permission_classes = [IsAuthenticated]
+
+    @swagger_auto_schema(
+        operation_description="Check if the current user is following a specific user.",
+        manual_parameters=[
+            openapi.Parameter(
+                'user_id',
+                openapi.IN_PATH,
+                description="UUID of the user to check follow status for",
+                type=openapi.TYPE_STRING,
+                format=openapi.FORMAT_UUID
+            ),
+        ],
+        responses={
+            200: openapi.Response(
+                description="Successful retrieval of follow status",
+                schema=openapi.Schema(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        'is_following': openapi.Schema(type=openapi.TYPE_BOOLEAN, description='True if the current user is following the target user, false otherwise'),
+                    }
+                )
+            ),
+            401: "Unauthorized",
+            404: "User not found"
+        }
+    )
+    def get(self, request, user_id):
+        try:
+            target_user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        is_following = Follow.objects.filter(follower=request.user, followed=target_user).exists()
+        return Response({'is_following': is_following}, status=status.HTTP_200_OK)

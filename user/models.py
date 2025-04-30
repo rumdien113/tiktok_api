@@ -1,3 +1,5 @@
+from django.utils import timezone
+from datetime import timedelta
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 import uuid
@@ -31,6 +33,10 @@ class User(AbstractBaseUser):
     bio = models.TextField(blank=True, null=True)
     last_login = None
 
+    otp_code = models.CharField(max_length=6, blank=True, null=True)
+    otp_expires_at = models.DateTimeField(blank=True, null=True)
+    is_verified = models.BooleanField(default=False)
+
     objects = UserManager()
 
     USERNAME_FIELD = 'email'
@@ -39,3 +45,20 @@ class User(AbstractBaseUser):
     def __str__(self):
         return self.email
 
+    def generate_otp(self):
+        import random
+        otp = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+        self.otp_code = otp
+        self.otp_expires_at = timezone.now() + timedelta(minutes=5)
+        self.save()
+        return otp
+
+    def is_otp_valid(self, otp_code):
+        if self.otp_code and self.otp_expires_at and timezone.now() <= self.otp_expires_at and self.otp_code == otp_code:
+            return True
+        return False
+    
+    def clear_otp(self):
+        self.otp_code = None
+        self.otp_expires_at = None
+        self.save()

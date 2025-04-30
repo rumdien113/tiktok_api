@@ -189,3 +189,5 @@ AUTH_USER_MODEL = 'user.User'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'ai_result', 'media')
+
+EMAIL_HOST_USER = 'rumdien113@gmail.com'
