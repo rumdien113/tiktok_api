@@ -9,6 +9,10 @@ import cv2
 import shutil
 import numpy as np
 
+import pickle
+import tensorflow as tf
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 # Import các model và config từ apps.py
 # Đảm bảo bạn đã cấu hình apps.py để load model như hướng dẫn trước
 from .apps import AiResultConfig # Thay AiResultConfig bằng tên class AppConfig của bạn nếu khác
@@ -212,3 +216,54 @@ def process_and_upload_video(video_file: InMemoryUploadedFile):
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
             logger.info(f"Removed temporary video file: {temp_file_path}")
+
+# Hàm xử lý text
+def get_sequences(texts, tokenizer, train=True, max_seq_length=2138):
+    if tokenizer is None:
+        logger.warning("Text tokenizer is not loaded. Cannot process text sequences.")
+        return None
+    # Sử dụng pad_sequences đã được import ở đầu file
+    sequences = tokenizer.texts_to_sequences(texts)
+    sequences = pad_sequences(sequences, maxlen=max_seq_length, padding='post', truncating='post')
+    return sequences
+
+# Hàm để phân tích văn bản comment - Đã sửa để trả về trạng thái và thông báo
+def analyze_comment_text(comment_content: str):
+    """
+    Phân tích nội dung comment bằng text model AI.
+    Trả về tuple (status, message).
+    Status: 0 (hợp lệ), 1 (không phù hợp), -1 (AI chưa sẵn sàng), -2 (lỗi xử lý).
+    Message: Thông báo chi tiết (rỗng nếu hợp lệ).
+    """
+    if AiResultConfig.text_model is None or AiResultConfig.text_tokenizer is None:
+        logger.error("Text model or tokenizer not loaded, cannot analyze comment.")
+        return (-1, 'Hệ thống phân tích văn bản AI chưa sẵn sàng.') # Trả về trạng thái và thông báo
+
+    if not isinstance(comment_content, str) or not comment_content.strip():
+        return (0, '') # Hợp lệ, comment rỗng hoặc chỉ có khoảng trắng
+
+    try:
+        # Tiền xử lý văn bản
+        processed_text = get_sequences([comment_content], AiResultConfig.text_tokenizer, train=False, max_seq_length=2138)
+
+        if processed_text is None:
+             logger.error('Lỗi tiền xử lý văn bản.')
+             return (-2, 'Lỗi tiền xử lý văn bản.') # Trả về trạng thái và thông báo
+
+        # Dự đoán bằng model
+        prediction = AiResultConfig.text_model.predict(processed_text, verbose=False) # Tắt verbose để không in tiến trình
+
+        # Ngưỡng phân loại (giữ nguyên ngưỡng 0.4 từ file gốc)
+        prediction_label = 1 if np.squeeze(prediction) >= 0.4 else 0
+
+        if prediction_label == 1:
+            logger.warning(f"Text analysis detected potentially harmful content in comment: '{comment_content[:50]}...'") # Log 50 ký tự đầu
+            return (1, 'Nội dung comment chứa từ ngữ không phù hợp.') # Trả về trạng thái và thông báo
+        else:
+            logger.info(f"Text analysis deemed comment valid: '{comment_content[:50]}...'")
+            return (0, '') # Trả về trạng thái và thông báo rỗng
+
+    except Exception as e:
+        logger.error(f"An error occurred during text analysis for comment: {str(e)}", exc_info=True)
+        return (-2, f'Lỗi phân tích văn bản: {str(e)}') # Trả về trạng thái và thông báo lỗi
+
