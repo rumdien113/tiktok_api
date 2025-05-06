@@ -20,7 +20,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'email', 'firstname', 'lastname',
                   'birthdate', 'phone', 'gender', 'avatar', 'bio', 'avatar_file']
-        read_only_fields = ['id', 'username', 'email']
+        read_only_fields = ['id', 'email']
 
     def update(self, instance, validated_data):
         avatar_file = validated_data.pop('avatar_file', None)
