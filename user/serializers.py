@@ -16,10 +16,14 @@ class UserCreateSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     avatar_file = serializers.FileField(write_only=True, required=False, allow_null=True)
 
+    followers_count = serializers.SerializerMethodField()
+    following_count = serializers.SerializerMethodField()
+    total_likes_on_posts = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'firstname', 'lastname',
-                  'birthdate', 'phone', 'gender', 'avatar', 'bio', 'avatar_file']
+                  'birthdate', 'phone', 'gender', 'avatar', 'bio', 'avatar_file', 'followers_count', 'following_count', 'total_likes_on_posts']
         read_only_fields = ['id', 'email']
 
     def update(self, instance, validated_data):
@@ -51,6 +55,31 @@ class UserSerializer(serializers.ModelSerializer):
         instance.save() 
 
         return instance
+
+    # Phương thức để lấy số lượng người đang follow user này (người này là followed_id)
+    def get_followers_count(self, obj):
+        # Import model tại đây để tránh circular dependency
+        from follow.models import Follow
+        return Follow.objects.filter(followed_id=obj.id).count()
+
+    # Phương thức để lấy số lượng user mà user này đang follow (người này là follower_id)
+    def get_following_count(self, obj):
+        # Import model tại đây để tránh circular dependency
+        from follow.models import Follow
+        return Follow.objects.filter(follower_id=obj.id).count()
+
+    # Phương thức để lấy tổng số like trên tất cả các post của user này
+    def get_total_likes_on_posts(self, obj):
+        # Import models tại đây
+        from post.models import Post
+        from like.models import Like
+
+        # Lấy danh sách ID của tất cả các bài post do user này tạo
+        user_post_ids = Post.objects.filter(user_id=obj.id).values_list('id', flat=True)
+
+        # Đếm tổng số like trên các bài post này
+        # target_type='post' là cần thiết để đảm bảo chỉ đếm like của post
+        return Like.objects.filter(target_id__in=list(user_post_ids), target_type='post').count()
  
 class UserLoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
