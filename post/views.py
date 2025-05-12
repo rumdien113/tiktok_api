@@ -74,7 +74,7 @@ class PostDetailView(APIView):
     )
     def get(self, request, post_id):
         post = get_object_or_404(Post, id=post_id)
-        serializer = PostSerializer(post)
+        serializer = PostSerializer(post, context={'request': request})
         return Response(serializer.data)
 
     @swagger_auto_schema(
