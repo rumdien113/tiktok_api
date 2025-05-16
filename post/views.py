@@ -57,7 +57,7 @@ class UserPostListView(APIView):
         try:
             user = User.objects.get(id=user_id)
             posts = Post.objects.filter(user=user)
-            serializer = PostSerializer(posts, many=True)
+            serializer = PostSerializer(posts, many=True, context={'request': request})
             return Response(serializer.data)
         except User.DoesNotExist:
             return Response({"detail": "User not found"}, status=status.HTTP_404_NOT_FOUND)
